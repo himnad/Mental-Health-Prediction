@@ -3,16 +3,15 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from pandas import DataFrame
 import pickle
-
-model = pickle.load(open(r"C:\Users\AKHIL\Downloads\Mental-Health-Prediction-Using-Machine-Learning\Mental-Health-Prediction-Using-Machine-Learning\model.pkl", 'rb'))
-ct = pickle.load(open(r"C:\Users\AKHIL\Downloads\Mental-Health-Prediction-Using-Machine-Learning\Mental-Health-Prediction-Using-Machine-Learning\ct.pkl", "rb"))
-le = pickle.load(open(r"C:\Users\AKHIL\Downloads\Mental-Health-Prediction-Using-Machine-Learning\Mental-Health-Prediction-Using-Machine-Learning\le.pkl", "rb"))
+1
+model = pickle.load(open(r"C:\Users\AKHIL\OneDrive\Documents\PROJECT_COLLEGE\Mental-Health-Prediction-Using-Machine-Learning\Mental-Health-Prediction-Using-Machine-Learning\model.pkl", 'rb'))
+ct = pickle.load(open(r"C:\Users\AKHIL\OneDrive\Documents\PROJECT_COLLEGE\Mental-Health-Prediction-Using-Machine-Learning\Mental-Health-Prediction-Using-Machine-Learning\ct.pkl", "rb"))
+le = pickle.load(open(r"C:\Users\AKHIL\OneDrive\Documents\PROJECT_COLLEGE\Mental-Health-Prediction-Using-Machine-Learning\Mental-Health-Prediction-Using-Machine-Learning\le.pkl", "rb"))
 app = Flask(__name__) 
 
 @app.route('/')
 def hello_world():
     return render_template('index.html')
-    # return 'Hello, AJAIN!'
     
 
 
@@ -53,10 +52,9 @@ def submit_form():
     treatment = le.inverse_transform(y)[0]
 
     if(treatment=="Yes"):
-        return f'{treatment}, You have Mental Health Problems. Kindly, Visit to nearest Psychiatrist Doctor.'
+        return render_template('treatmentY.html')
     else:
-        return f'{treatment}, You does not Mental Health Problems'
-
+        return render_template('treatmentN.html')
 
 
 @app.route('/teampage')
