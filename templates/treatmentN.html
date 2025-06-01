@@ -8,6 +8,7 @@
       background-color: #e8f5e9;
       font-family: 'Segoe UI', sans-serif;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       height: 100vh;
@@ -22,6 +23,7 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
       text-align: center;
       max-width: 600px;
+      margin-top: 50%;
     }
 
     .box h1 {
@@ -35,12 +37,21 @@
       margin: 20px 0;
     }
 
+    p {
+      color: #1976d2;
+      font-size: 1.2em;
+      margin-bottom: 20px;
+    }
+
     .box img {
       width: 100%;
       max-height: 250px;
       object-fit: cover;
       border-radius: 10px;
       margin-top: 20px;
+    }
+    .bar-graph{
+      margin-top: 10%;
     }
   </style>
 </head>
@@ -49,6 +60,11 @@
     <h1>You're Doing Great!</h1>
     <p>NO, YOU DO NOT NEED MEDICAL ASSISTANCE, YOU ARE FINE</p>
     <img src="https://img.freepik.com/free-photo/smiling-handsome-redhead-man-showing-thumbs-up-approval-like-agree-praise-recommend-promotional-offer-satisfied-by-something-standing-white-wall_176420-38470.jpg?semt=ais_hybrid&w=740" alt="Happy and Healthy">
+  </div>
+  <img class="bar-graph" src="data:image/png;base64,{{ image_base64 }}" alt="Bar Graph">
+  <div class="cat">
+   <p><strong>A:</strong> Age <strong>B:</strong> Gender <strong>C:</strong> self_employed <strong>D:</strong> family_history <strong>E:</strong> remote_work</p>
+<p><strong>F:</strong> care_options <strong>G:</strong> anonymity <strong>H:</strong> leave <strong>I:</strong> colleague <strong>J:</strong> obs_consequence</p>
   </div>
 </body>
 </html>
