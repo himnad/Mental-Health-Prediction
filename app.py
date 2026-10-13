@@ -1,118 +1,330 @@
-from flask import Flask,url_for, redirect, render_template , request
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
-from pandas import DataFrame
-import pickle
-import matplotlib.pyplot as plt
-import matplotlib
-import base64
+
+from pathlib import Path
 from io import BytesIO
-import pandas as pd
+import base64
+import logging
+import pickle
+
+import matplotlib
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
-matplotlib.use('Agg')
-model = pickle.load(open(r"C:\Users\AKHIL\OneDrive\Documents\PROJECT_COLLEGE\Mental-Health-Prediction-Using-Machine-Learning\Mental-Health-Prediction-Using-Machine-Learning\model.pkl", 'rb'))
-ct = pickle.load(open(r"C:\Users\AKHIL\OneDrive\Documents\PROJECT_COLLEGE\Mental-Health-Prediction-Using-Machine-Learning\Mental-Health-Prediction-Using-Machine-Learning\ct.pkl", "rb"))
-le = pickle.load(open(r"C:\Users\AKHIL\OneDrive\Documents\PROJECT_COLLEGE\Mental-Health-Prediction-Using-Machine-Learning\Mental-Health-Prediction-Using-Machine-Learning\le.pkl", "rb"))
-app = Flask(__name__) 
-
-@app.route('/')
-def hello_world():
-    return render_template('index.html')
-    
+from flask import Flask, render_template, request
+from werkzeug.exceptions import BadRequestKeyError
 
 
-@app.get('/form')
+# -----------------------------
+# Configuration
+# -----------------------------
+
+BASE_DIR = Path(__file__).resolve().parent
+
+app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
+
+FEATURES = [
+    "Age",
+    "Gender",
+    "self_employed",
+    "family_history",
+    "remote_work",
+    "care_options",
+    "anonymity",
+    "leave",
+    "coworkers",
+    "supervisor",
+    "obs_consequence",
+]
+
+
+# -----------------------------
+# Load ML model and transformers
+# Only load pickle files you trust.
+# -----------------------------
+
+def load_pickle(filename):
+    path = BASE_DIR / filename
+
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Required file not found: {path}"
+        )
+
+    with path.open("rb") as file:
+        return pickle.load(file)
+
+
+model = load_pickle("model.pkl")
+ct = load_pickle("ct.pkl")
+le = load_pickle("le.pkl")
+
+
+# -----------------------------
+# Load processed dataset
+# -----------------------------
+
+def load_dataset():
+    path = BASE_DIR / "processed_data.csv"
+
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Dataset not found: {path}"
+        )
+
+    return pd.read_csv(path)
+
+
+# -----------------------------
+# Home page
+# -----------------------------
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+
+# -----------------------------
+# Prediction form
+# -----------------------------
+
+@app.get("/form")
 def show_form():
-     return render_template('form.html')
+    return render_template("form.html")
 
-@app.post('/submit_form')
-def submit_form():
 
-    data = [{
-         "Age": int(request.form["inputAge"]),
-         "Gender": request.form["inputGender"],
-         "self_employed": request.form["inputSelfEmployed"],
-         "family_history": request.form["inputFamilyHistory"],
-        #  "work_interfere": request.form["inputWorkInterference"],
-        #  "no_employees": request.form["inputNoOfEmp"],
-         "remote_work": request.form["inputRemoteWork"],
-        #  "tech_company": request.form["inputTechCompany"],
-        #  "benefits": request.form["inputBenefits"],
-         "care_options": request.form["inputCareOptions"],
-        #  "wellness_program": request.form["inputWellnessProgram"],
-        #  "seek_help": request.form["inputSeekHelp"],
-         "anonymity": request.form["inputAnonymity"],
-         "leave": request.form["inputLeave"],
-        #  "mental_health_consequence": request.form["inputMentalHealthConsequence"],
-        #  "phys_health_consequence": request.form["inputPhysHealthConsequence"],
-         "coworkers": request.form["inputColleague"],
-         "supervisor": request.form["inputColleague"],
-        #  "mental_health_interview": request.form["inputMentalHealthInterview"],
-        #  "phys_health_interview": request.form["inputPhysHealthInterview"],
-        #  "mental_vs_physical": request.form["inputMentalVsPhysical"],
-         "obs_consequence": request.form["inputObsConsequence"],
-     }]
-    df = DataFrame.from_records(data)
-    x = ct.transform(df)
-    y = model.predict(x)
-    treatment = le.inverse_transform(y)[0]
+# -----------------------------
+# Read and validate form data
+# -----------------------------
 
-    dataf = pd.read_csv(r"C:\Users\AKHIL\OneDrive\Documents\PROJECT_COLLEGE\Mental-Health-Prediction-Using-Machine-Learning\Mental-Health-Prediction-Using-Machine-Learning\processed_data.csv")
-    print(dataf.columns)
+def get_form_data(form):
+
+    age = int(form["inputAge"])
+
+    if not 1 <= age <= 120:
+        raise ValueError(
+            "Age must be between 1 and 120."
+        )
+
+    # Use the separate supervisor field when present.
+    # Fall back to the old field for compatibility
+    # until form.html is updated.
+    supervisor = form.get("inputSupervisor")
+
+    if supervisor is None:
+        supervisor = form["inputColleague"]
+
+    data = {
+        "Age": age,
+        "Gender": form["inputGender"],
+        "self_employed": form["inputSelfEmployed"],
+        "family_history": form["inputFamilyHistory"],
+        "remote_work": form["inputRemoteWork"],
+        "care_options": form["inputCareOptions"],
+        "anonymity": form["inputAnonymity"],
+        "leave": form["inputLeave"],
+        "coworkers": form["inputColleague"],
+        "supervisor": supervisor,
+        "obs_consequence": form["inputObsConsequence"],
+    }
+
+    return pd.DataFrame([data], columns=FEATURES)
+
+
+# -----------------------------
+# Generate comparison graph
+# -----------------------------
+
+def generate_graph(user_data):
+
+    dataset = load_dataset()
+
+    required_columns = set(FEATURES + ["treatment"])
+
+    missing_columns = required_columns - set(
+        dataset.columns
+    )
+
+    if missing_columns:
+        raise ValueError(
+            "Missing dataset columns: "
+            + ", ".join(sorted(missing_columns))
+        )
+
     yes_counts = []
     no_counts = []
-    # Categories on X-axis
-    labels = ['A','B','C','D','E','F','G','H','I','J']
-    cat = ['Age','Gender', 'self_employed', 'family_history','remote_work','care_options', 
-           'anonymity', 'leave', 'coworkers', 'supervisor','obs_consequence']
-    for i in cat:
-        ycount = dataf[(dataf['treatment'] == 'Yes') & (dataf[i] == data[0][i])].shape[0]
-        ncount = dataf[(dataf['treatment'] == 'No') & (dataf[i] == data[0][i])].shape[0]
-        yes_counts.append(ycount)
-        no_counts.append(ncount)
 
-    yes_counts[8] += yes_counts[9]
-    yes_counts.pop(9)
-    
-    no_counts[8] += no_counts[9]
-    no_counts.pop(9)
-    # Bar width
-    width = 0.35  
+    for feature in FEATURES:
 
-    # Position of bars on X-axis
-    x = np.arange(len(labels)) 
+        selected_value = user_data.iloc[0][feature]
 
-    # Plotting the bars
-    plt.figure(figsize=(8, 5))
-    plt.bar(x - width/2, yes_counts, width, label='Yes', color='skyblue')
-    plt.bar(x + width/2, no_counts, width, label='No', color='orange')
+        matching = dataset[
+            dataset[feature] == selected_value
+        ]
 
-    # Labeling
-    plt.xlabel('Categories')
-    plt.ylabel('Count')
-    plt.title('Treatment Counts by Category')
-    plt.xticks(x, labels)
-    plt.legend()
+        yes_count = (
+            matching["treatment"] == "Yes"
+        ).sum()
 
-    plt.tight_layout()
-    
-    buf = BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight')
-    buf.seek(0)
-    image_base64 = base64.b64encode(buf.read()).decode('utf-8')
-    buf.close()
+        no_count = (
+            matching["treatment"] == "No"
+        ).sum()
 
-    if(treatment=="Yes"):
-        return render_template('treatmentY.html',image_base64 = image_base64)
-    else:
-        return render_template('treatmentN.html',image_base64 = image_base64)
+        yes_counts.append(int(yes_count))
+        no_counts.append(int(no_count))
+
+    # Keep all 11 features separate.
+    positions = np.arange(len(FEATURES))
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    try:
+        ax.bar(
+            positions - width / 2,
+            yes_counts,
+            width,
+            label="Yes",
+            color="skyblue"
+        )
+
+        ax.bar(
+            positions + width / 2,
+            no_counts,
+            width,
+            label="No",
+            color="orange"
+        )
+
+        ax.set_xlabel("Survey Features")
+        ax.set_ylabel("Number of Respondents")
+
+        ax.set_title(
+            "Treatment History by Matching Survey Feature"
+        )
+
+        ax.set_xticks(positions)
+
+        ax.set_xticklabels(
+            FEATURES,
+            rotation=45,
+            ha="right"
+        )
+
+        ax.legend()
+        fig.tight_layout()
+
+        buffer = BytesIO()
+
+        fig.savefig(
+            buffer,
+            format="png",
+            bbox_inches="tight"
+        )
+
+        buffer.seek(0)
+
+        encoded_image = base64.b64encode(
+            buffer.read()
+        ).decode("utf-8")
+
+        buffer.close()
+
+        return encoded_image
+
+    finally:
+        plt.close(fig)
 
 
-@app.route('/teampage')
-def teampage():
-    return 'Welcome to Team page.'
+# -----------------------------
+# Prediction route
+# -----------------------------
+
+@app.post("/submit_form")
+def submit_form():
+
+    try:
+        user_data = get_form_data(request.form)
+
+        # Preprocessing
+        transformed_data = ct.transform(user_data)
+
+        # Prediction
+        prediction = model.predict(transformed_data)
+
+        # Decode prediction
+        treatment = str(
+            le.inverse_transform(prediction)[0]
+        )
+
+        app.logger.info(
+            "Prediction completed successfully"
+        )
+
+        # Generate comparison visualization
+        image_base64 = generate_graph(user_data)
+
+        if treatment == "Yes":
+            template = "treatmentY.html"
+
+        elif treatment == "No":
+            template = "treatmentN.html"
+
+        else:
+            raise ValueError(
+                "Unexpected prediction label."
+            )
+
+        return render_template(
+            template,
+            image_base64=image_base64,
+            treatment=treatment
+        )
+
+    except (ValueError, KeyError, BadRequestKeyError) as error:
+
+        app.logger.warning(
+            "Invalid form submission: %s",
+            error
+        )
+
+        return (
+            "Invalid form input. Please check all "
+            "fields and try again.",
+            400
+        )
+
+    except Exception:
+
+        app.logger.exception(
+            "Prediction failed"
+        )
+
+        return (
+            "Unable to process your request. "
+            "Please try again later.",
+            500
+        )
 
 
-if __name__=="__main__":
-    app.run(debug=False, port=8000)
+# -----------------------------
+# Team page
+# -----------------------------
+
+@app.route("/teampage")
+def team_page():
+    return "Welcome to Team page."
+
+
+# -----------------------------
+# Run application
+# -----------------------------
+
+if __name__ == "__main__":
+    app.run(
+        host="127.0.0.1",
+        port=8000,
+        debug=False
+    )
