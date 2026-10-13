@@ -1,3 +1,9 @@
+## Live Demo
+
+[Click here to try the Mental Health Prediction App](https://mental-health-prediction-kylq.onrender.com)
+
+> This is an educational ML project that predicts survey treatment-seeking responses, not a medical diagnosis.
+
 <h1>Mental Health Prediction Using<br />Machine Learning</h1>
 
 This project aims to use machine learning techniques to predict mental health conditions in individuals based on their demographic and socio-economic information. The dataset used for this project is taken from Kaggle and contains survey responses from individuals working in the technology industry.
